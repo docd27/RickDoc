@@ -59,7 +59,7 @@ app.engine('handlebars', expressHandlebars());
 app.set('view engine', 'handlebars');
 
 app.disable('x-powered-by');
-app.set('trust proxy', '127.0.0.1');
+app.set('trust proxy', process.env.TRUST_PROXY_IPS);
 
 app.use((req, res, next) => {
   res.set('Cache-Control', 'public, max-age=86400'); // Cache 24 hours
