@@ -131,7 +131,7 @@ app.get('*', async (req, res, next) => {
     headerLines.push(rewriteCSS(styleHTML, cloneBaseURL));
   });
   res.locals.pageInfo = {
-    baseCloneURL: cloneURL,
+    baseCloneURL: cloneBaseURL,
     // @ts-ignore
     baseURL: req.custBaseURL,
     // @ts-ignore
