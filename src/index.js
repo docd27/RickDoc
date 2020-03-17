@@ -55,6 +55,10 @@ async function mdnRequest(headers, url) {
   return response;
 }
 
+const logReq = (req, msg='') => {
+  console.log(`${(new Date()).toISOString()} ${req.ip}: ${req.method} ${req.originalUrl} ${msg}`);
+};
+
 app.engine('handlebars', expressHandlebars());
 app.set('view engine', 'handlebars');
 
@@ -67,12 +71,12 @@ app.use((req, res, next) => {
   req.custReqURL = fullURL(req, req.originalUrl);
   // @ts-ignore
   req.custBaseURL = fullURL(req, req.baseUrl.replace(/\/+$/, ''));
-  console.log(`${req.ip}: ${req.method} ${req.originalUrl}`);
+  logReq(req);
   next();
 });
 
 app.use((err, req, res, next) => { // Error handler
-  console.log(`${req.ip}: ${req.method} ${req.originalUrl} ERROR`);
+  logReq(req, 'ERROR');
   console.error(err.stack)
   res.status(500).send('Internal Server Error');
 });
@@ -90,14 +94,14 @@ app.get('/favicon.ico', (req, res, next) => res.redirect(`${cloneBaseURL}/static
 app.get('*', async (req, res, next) => {
   const cloneURL = relToAbsoluteURL(req.originalUrl, cloneBaseURL);
 
-  console.log(`${req.ip}: FETCH ${cloneURL}`);
+  logReq(req, `FETCH ${cloneURL}`);
   const mdnResult = await mdnRequest(req.headers, cloneURL);
   res.statusCode = mdnResult.status;
   res.statusMessage = mdnResult.statusText;
 
   if (!mdnResult.headers.has('content-type') ||
       !typeis.is(mdnResult.headers.get('content-type'), 'text/html')) {
-    console.log(`${req.ip}: REDIRECT ${mdnResult.headers.get('content-type')} TO ${req.originalUrl}`);
+    logReq(req, `REDIRECT ${mdnResult.headers.get('content-type')} TO ${req.originalUrl}`);
     // Request to a non-html resource got through, redirect
     res.redirect(cloneURL);
     return;
@@ -150,7 +154,7 @@ app.get('*', async (req, res, next) => {
 });
 
 app.all('*', (req, res, next) => { // POST etc
-  console.log(`${req.ip}: ${req.method} ${req.originalUrl} 404 Not Found`);
+  logReq(req, '404 Not Found');
   res.status(404).send('Not Found');
 });
 
