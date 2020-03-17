@@ -56,7 +56,7 @@ async function mdnRequest(headers, url) {
 }
 
 const logReq = (req, msg) => {
-  console.log(`${(new Date()).toISOString()} ${req.ip}: ${msg}`);
+  console.log(`[${(new Date()).toISOString()}] ${req.ip}: ${msg}`);
 };
 
 app.engine('handlebars', expressHandlebars());
