@@ -55,8 +55,8 @@ async function mdnRequest(headers, url) {
   return response;
 }
 
-const logReq = (req, msg='') => {
-  console.log(`${(new Date()).toISOString()} ${req.ip}: ${req.method} ${req.originalUrl} ${msg}`);
+const logReq = (req, msg) => {
+  console.log(`${(new Date()).toISOString()} ${req.ip}: ${msg}`);
 };
 
 app.engine('handlebars', expressHandlebars());
@@ -71,7 +71,7 @@ app.use((req, res, next) => {
   req.custReqURL = fullURL(req, req.originalUrl);
   // @ts-ignore
   req.custBaseURL = fullURL(req, req.baseUrl.replace(/\/+$/, ''));
-  logReq(req);
+  logReq(req, `${req.method} ${req.originalUrl}`);
   next();
 });
 
@@ -154,7 +154,7 @@ app.get('*', async (req, res, next) => {
 });
 
 app.all('*', (req, res, next) => { // POST etc
-  logReq(req, '404 Not Found');
+  logReq(req, `${req.method} ${req.originalUrl} 404 Not Found`);
   res.status(404).send('Not Found');
 });
 
