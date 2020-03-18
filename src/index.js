@@ -1,19 +1,13 @@
 const fetch = require('node-fetch').default;
-const util = require('util');
 const path = require('path');
 const cheerio = require('cheerio');
-const {version: packageVersion} = require('../package.json');
 const express = require('express');
 const typeis = require('type-is');
-const expressHandlebars  = require('express-handlebars');
-require('dotenv').config({ path: path.join(__dirname, '..', '.env')});
+const expressHandlebars = require('express-handlebars');
 
-const json2 = (obj, depth=6) => {
-  console.log(util.inspect(obj, {depth: depth, colors: true, compact: 3}));
-};
+require('dotenv').config({path: path.join(__dirname, '..', '.env')});
 
 const app = express();
-app.set('views', path.join(__dirname, '..', 'views'));
 const port = Number.parseInt(process.env.PORT, 10);
 const cloneBaseURL = process.env.CLONE_URL;
 
@@ -31,34 +25,29 @@ const relToAbsoluteURL = (url, base) => {
   } catch {
     return url;
   }
-}
-
-const rewriteCSS = (styleHTML, base) => {
-  return styleHTML.replace(/url\s*\((?:([^\)']*)|\s*'([^']*)'\s*)\)/g, function(match, g1, g2, offset, input_string)
-  {
-    return `url('${relToAbsoluteURL(g1 === undefined ? g2 : g1, base)}')`;
-  });
-}
-
-async function mdnRequest(headers, url) {
-  // const url = new URL(path, 'http://httpbin.org/');
-  const response = await fetch(url, {
-    method: 'GET',
-    // cache: 'reload',
-    headers: {
-      'Accept': headers.accept ? headers.accept : 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': headers['accept-language'] ? headers['accept-language'] : 'en-US',
-      'DNT': '1',
-      'User-Agent': headers['user-agent'] ? headers['user-agent'] : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:74.0) Gecko/20100101 Firefox/74.0',
-    },
-  });
-  return response;
-}
-
-const logReq = (req, msg) => {
-  console.log(`[${(new Date()).toISOString()}] ${req.ip}: ${msg}`);
 };
 
+const rewriteCSS = (styleHTML, base) =>
+  styleHTML.replace(/url\s*\((?:([^)']*)|\s*'([^']*)'\s*)\)/g,
+      (match, g1, g2, offset, inputString) => {
+        return `url('${relToAbsoluteURL(g1 === undefined ? g2 : g1, base)}')`;
+      });
+
+const logReq = (req, msg) => console.log(`[${(new Date()).toISOString()}] ${req.ip}: ${msg}`);
+
+const mdnRequest = async (headers, url) => fetch(url, {
+  method: 'GET',
+  // cache: 'reload',
+  headers: {
+    'Accept': headers.accept ? headers.accept : 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': headers['accept-language'] ? headers['accept-language'] : 'en-US',
+    'DNT': '1',
+    'User-Agent': headers['user-agent'] ? headers['user-agent']:
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:74.0) Gecko/20100101 Firefox/74.0',
+  },
+});
+
+app.set('views', path.join(__dirname, '..', 'views'));
 app.engine('handlebars', expressHandlebars());
 app.set('view engine', 'handlebars');
 
@@ -77,11 +66,11 @@ app.use((req, res, next) => {
 
 app.use((err, req, res, next) => { // Error handler
   logReq(req, 'ERROR');
-  console.error(err.stack)
+  console.error(err.stack);
   res.status(500).send('Internal Server Error');
 });
 
-//app.use('/static', express.static(path.join(__dirname, '..', 'static')));
+// app.use('/static', express.static(path.join(__dirname, '..', 'static')));
 
 app.get('/robots.txt', (req, res, next) => {
   res.type('text/plain');
@@ -110,8 +99,7 @@ app.get('*', async (req, res, next) => {
   const $doc = cheerio.load(mdnHTML);
 
   const metaVals = new Map();
-  $doc('meta', 'head').each((i, e) =>
-  {
+  $doc('meta', 'head').each((i, e) => {
     if (e.attribs['name']) {
       metaVals.set(e.attribs['name'], e.attribs['content']);
     } else if (e.attribs['property']) {
@@ -122,15 +110,13 @@ app.get('*', async (req, res, next) => {
 
   const headerLines = [];
   // headerLines.push(`<base href="${cloneBaseURL}">`);
-  $doc('link', 'head').each((i, e) =>
-  {
+  $doc('link', 'head').each((i, e) => {
     if (e.attribs['href']) {
       e.attribs['href'] = relToAbsoluteURL(e.attribs['href'], cloneBaseURL);
       headerLines.push($doc.html(e));
     }
   });
-  $doc('style', 'head').each((i, e) =>
-  {
+  $doc('style', 'head').each((i, e) => {
     const styleHTML = $doc.html(e);
     headerLines.push(rewriteCSS(styleHTML, cloneBaseURL));
   });
@@ -143,7 +129,7 @@ app.get('*', async (req, res, next) => {
     pageTitle,
     metaTitle: metaVals.get('og:title'),
     metaDescription: metaVals.get('og:description'),
-  }
+  };
   res.locals.cloneURL = cloneURL;
 
   res.locals.headers = headerLines.join('\n');
@@ -158,4 +144,4 @@ app.all('*', (req, res, next) => { // POST etc
   res.status(404).send('Not Found');
 });
 
-app.listen(port, 'localhost', () => console.log(`App listening on port ${port}!`))
+app.listen(port, 'localhost', () => console.log(`App listening on port ${port}!`));
