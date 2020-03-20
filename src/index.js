@@ -9,13 +9,14 @@ require('dotenv').config({path: path.join(__dirname, '..', '.env')});
 
 const app = express();
 const port = Number.parseInt(process.env.PORT, 10);
+const extPort = Number.parseInt(process.env.EXT_PORT, 10);
 const cloneBaseURL = process.env.CLONE_URL;
 
 const fullURL = (req, path) => {
   const url = new URL(path, 'http://localhost');
   url.protocol = req.protocol;
   url.hostname = req.hostname;
-  url.port = `${port}`;
+  url.port = `${extPort}`;
   return url.toString();
 };
 
