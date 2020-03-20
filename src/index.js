@@ -39,6 +39,7 @@ const prefixSlash = (urlPath) => urlPath.length && urlPath[0] === '/' ? urlPath 
 
 const mdnRequest = async (headers, url) => fetch(url, {
   method: 'GET',
+  redirect: 'manual',
   // cache: 'reload',
   headers: {
     'Accept': headers.accept ? headers.accept : 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -96,6 +97,18 @@ app.get('*', async (req, res, next) => {
       logReq(req, `REDIRECT ${mdnResult.headers.get('content-type')} TO ${req.originalUrl}`);
       // Request to a non-html resource got through, redirect
       res.redirect(cloneURL);
+      return;
+    } else if (mdnResult.headers.has('location')) {
+      /**
+       * Note the current WHATWG fetch() spec doesn't provide a way for retrieving
+       * the destination URL of an http redirect instead returning a useless
+       * 'type: opaqueredirect' object https://github.com/whatwg/fetch/issues/763
+       * But node-fetch does return the location header unlike browser fetch()
+       * i.e. this logic is node-fetch specific
+       */
+      logReq(req, `LOCATION ${mdnResult.headers.get('location')}`);
+      res.setHeader('Location', mdnResult.headers.get('location'));
+      res.end();
       return;
     }
     const mdnHTML = await mdnResult.text();
