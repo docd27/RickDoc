@@ -27,6 +27,21 @@ const relToAbsoluteURL = (url, base) => {
   }
 };
 
+const rewriteURLRelativeTo = (rewrite, base) => {
+  try {
+    const url = new URL(rewrite);
+    const rel = new URL(base);
+    url.hostname = rel.hostname;
+    url.protocol = rel.protocol;
+    url.port = rel.port;
+    url.username = rel.username;
+    url.password = rel.password;
+    return url.toString();
+  } catch {
+    return base;
+  }
+};
+
 const rewriteCSS = (styleHTML, base) =>
   styleHTML.replace(/url\s*\((?:([^)']*)|\s*'([^']*)'\s*)\)/g,
       (match, g1, g2, offset, inputString) => {
@@ -106,8 +121,9 @@ app.get('*', async (req, res, next) => {
        * But node-fetch does return the location header unlike browser fetch()
        * i.e. this logic is node-fetch specific
        */
-      logReq(req, `LOCATION ${mdnResult.headers.get('location')}`);
-      res.setHeader('Location', mdnResult.headers.get('location'));
+      const locationURL = rewriteURLRelativeTo(mdnResult.headers.get('location'), cloneBaseURL);
+      logReq(req, `LOCATION ${locationURL}`);
+      res.setHeader('Location', locationURL);
       res.end();
       return;
     }
