@@ -121,7 +121,7 @@ app.get('*', async (req, res, next) => {
        * But node-fetch does return the location header unlike browser fetch()
        * i.e. this logic is node-fetch specific
        */
-      const locationURL = rewriteURLRelativeTo(mdnResult.headers.get('location'), cloneBaseURL);
+      const locationURL = rewriteURLRelativeTo(mdnResult.headers.get('location'), fullURL(req, ''));
       logReq(req, `LOCATION ${locationURL}`);
       res.setHeader('Location', locationURL);
       res.end();
