@@ -35,6 +35,8 @@ const rewriteCSS = (styleHTML, base) =>
 
 const logReq = (req, msg) => console.log(`[${(new Date()).toISOString()}] ${req.ip}: ${msg}`);
 
+const prefixSlash = (urlPath) => urlPath.length && urlPath[0] === '/' ? urlPath : '/' + urlPath;
+
 const mdnRequest = async (headers, url) => fetch(url, {
   method: 'GET',
   // cache: 'reload',
@@ -81,62 +83,68 @@ app.get('/robots.txt', (req, res, next) => {
 app.get('/favicon.ico', (req, res, next) => res.redirect(`${cloneBaseURL}/static/img/favicon32.7f3da72dcea1.png`));
 
 app.get('*', async (req, res, next) => {
-  const cloneURL = relToAbsoluteURL(req.originalUrl, cloneBaseURL);
+  const cloneURL = cloneBaseURL + prefixSlash(req.originalUrl);
 
   logReq(req, `FETCH ${cloneURL}`);
-  const mdnResult = await mdnRequest(req.headers, cloneURL);
-  res.statusCode = mdnResult.status;
-  res.statusMessage = mdnResult.statusText;
+  try {
+    const mdnResult = await mdnRequest(req.headers, cloneURL);
+    res.statusCode = mdnResult.status;
+    res.statusMessage = mdnResult.statusText;
 
-  if (!mdnResult.headers.has('content-type') ||
-      !typeis.is(mdnResult.headers.get('content-type'), 'text/html')) {
-    logReq(req, `REDIRECT ${mdnResult.headers.get('content-type')} TO ${req.originalUrl}`);
-    // Request to a non-html resource got through, redirect
-    res.redirect(cloneURL);
-    return;
+    if (!mdnResult.headers.has('content-type') ||
+        !typeis.is(mdnResult.headers.get('content-type'), 'text/html')) {
+      logReq(req, `REDIRECT ${mdnResult.headers.get('content-type')} TO ${req.originalUrl}`);
+      // Request to a non-html resource got through, redirect
+      res.redirect(cloneURL);
+      return;
+    }
+    const mdnHTML = await mdnResult.text();
+    const $doc = cheerio.load(mdnHTML);
+
+    const metaVals = new Map();
+    $doc('meta', 'head').each((i, e) => {
+      if (e.attribs['name']) {
+        metaVals.set(e.attribs['name'], e.attribs['content']);
+      } else if (e.attribs['property']) {
+        metaVals.set(e.attribs['property'], e.attribs['content']);
+      }
+    });
+    const pageTitle = $doc('title', 'head').text();
+
+    const headerLines = [];
+    // headerLines.push(`<base href="${cloneBaseURL}">`);
+    $doc('link', 'head').each((i, e) => {
+      if (e.attribs['href']) {
+        e.attribs['href'] = relToAbsoluteURL(e.attribs['href'], cloneBaseURL);
+        headerLines.push($doc.html(e));
+      }
+    });
+    $doc('style', 'head').each((i, e) => {
+      const styleHTML = $doc.html(e);
+      headerLines.push(rewriteCSS(styleHTML, cloneBaseURL));
+    });
+    res.locals.pageInfo = {
+      baseCloneURL: cloneBaseURL,
+      // @ts-ignore
+      baseURL: req.custBaseURL,
+      // @ts-ignore
+      pageURL: req.custReqURL,
+      pageTitle,
+      metaTitle: metaVals.get('og:title'),
+      metaDescription: metaVals.get('og:description'),
+    };
+    res.locals.cloneURL = cloneURL;
+
+    res.locals.headers = headerLines.join('\n');
+
+    $doc('script', 'body').remove();
+    res.locals.bodyContent = $doc('body').html();
+    res.render('container');
+  } catch (err) {
+    logReq(req, 'FETCH ERROR');
+    console.error(err.stack);
+    res.status(404).send('Not Found');
   }
-  const mdnHTML = await mdnResult.text();
-  const $doc = cheerio.load(mdnHTML);
-
-  const metaVals = new Map();
-  $doc('meta', 'head').each((i, e) => {
-    if (e.attribs['name']) {
-      metaVals.set(e.attribs['name'], e.attribs['content']);
-    } else if (e.attribs['property']) {
-      metaVals.set(e.attribs['property'], e.attribs['content']);
-    }
-  });
-  const pageTitle = $doc('title', 'head').text();
-
-  const headerLines = [];
-  // headerLines.push(`<base href="${cloneBaseURL}">`);
-  $doc('link', 'head').each((i, e) => {
-    if (e.attribs['href']) {
-      e.attribs['href'] = relToAbsoluteURL(e.attribs['href'], cloneBaseURL);
-      headerLines.push($doc.html(e));
-    }
-  });
-  $doc('style', 'head').each((i, e) => {
-    const styleHTML = $doc.html(e);
-    headerLines.push(rewriteCSS(styleHTML, cloneBaseURL));
-  });
-  res.locals.pageInfo = {
-    baseCloneURL: cloneBaseURL,
-    // @ts-ignore
-    baseURL: req.custBaseURL,
-    // @ts-ignore
-    pageURL: req.custReqURL,
-    pageTitle,
-    metaTitle: metaVals.get('og:title'),
-    metaDescription: metaVals.get('og:description'),
-  };
-  res.locals.cloneURL = cloneURL;
-
-  res.locals.headers = headerLines.join('\n');
-
-  $doc('script', 'body').remove();
-  res.locals.bodyContent = $doc('body').html();
-  res.render('container');
 });
 
 app.all('*', (req, res, next) => { // POST etc
